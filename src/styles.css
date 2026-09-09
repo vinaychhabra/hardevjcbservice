@@ -1,0 +1,131 @@
+/* Design direction: this is a working tool for equipment-rental
+   operators — dispatchers, yard managers, accountants — often used on
+   a tablet in a site office, not a marketing surface. Palette leans
+   toward the steel/hazard-amber vocabulary of the industry itself
+   rather than a generic SaaS look: graphite structural chrome, paper
+   content area, amber reserved only for primary actions and the
+   active nav item. Numbers/codes (asset IDs, invoice numbers) use a
+   monospace face since they're inventory data, not prose. Panels are
+   flat with hairline borders, not shadowed cards. */
+
+:root {
+  --graphite-900: #14181d;
+  --graphite-800: #1b2430;
+  --graphite-700: #2a3644;
+  --paper: #f5f6f4;
+  --paper-raised: #ffffff;
+  --line: #dde1de;
+  --text: #14181d;
+  --text-muted: #5b6570;
+  --amber: #e8871e;
+  --amber-dark: #c46f14;
+  --green: #2f7a4d;
+  --blue: #2b5f9e;
+  --violet: #6a4fa0;
+  --red: #b23b3b;
+
+  --font-ui: "Manrope", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--paper);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a { color: inherit; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn:hover { border-color: var(--graphite-700); }
+.btn-primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--graphite-900);
+}
+.btn-primary:hover { background: var(--amber-dark); border-color: var(--amber-dark); }
+
+.input, select.input, textarea.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper-raised);
+  color: var(--text);
+}
+.input:focus, select.input:focus, textarea.input:focus {
+  outline: 2px solid var(--amber);
+  outline-offset: -1px;
+}
+
+label.field {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.field-group { margin-bottom: 14px; }
+
+.panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.mono { font-family: var(--font-mono); }
+
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.data-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+}
+table.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+table.data-table tbody tr:hover { background: var(--paper); }
+
+.status-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.status-available { background: #e4f2e8; color: var(--green); }
+.status-on_rent, .status-reserved, .status-dispatched { background: #e6edf6; color: var(--blue); }
+.status-maintenance, .status-inspection, .status-returning { background: #fbeedb; color: var(--amber-dark); }
+.status-breakdown, .status-lost_missing { background: #f6e4e4; color: var(--red); }
+.status-inactive, .status-sold { background: #ececea; color: var(--text-muted); }
