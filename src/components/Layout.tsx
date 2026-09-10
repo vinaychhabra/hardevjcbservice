@@ -73,3 +73,6 @@ export default function Layout() {
     </div>
   );
 }
+
+//https://dclhnujrgcmupijsefak.supabase.co
+//sb_publishable_sNKpDUpxmFsLMtHKuh4cCw_EQbR01Wx
