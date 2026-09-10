@@ -31,7 +31,7 @@ export default function EquipmentCategories() {
       </div>
       <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 20 }}>
         Define your own equipment types — nothing here is hard-coded. Each category can have its
-        own custom fields (e.g. bucket capacity, KVA rating) that show up when adding an asset.
+        own custom fields (e.g. bucket capacity, KVA rating) that show up when adding a machine.
       </p>
 
       {showForm && <CategoryForm onSaved={() => { setShowForm(false); load(); }} />}

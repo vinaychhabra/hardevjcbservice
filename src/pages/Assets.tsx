@@ -30,16 +30,16 @@ export default function Assets() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22 }}>Assets</h1>
+        <h1 style={{ fontSize: 22 }}>Machines</h1>
         {hasPermission("equipment.write") && (
           <button className="btn btn-primary" onClick={() => setShowForm((s) => !s)} disabled={categories.length === 0}>
-            {showForm ? "Cancel" : "Add asset"}
+            {showForm ? "Cancel" : "Add machine"}
           </button>
         )}
       </div>
       {categories.length === 0 && (
         <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
-          Create an equipment category first, then add assets against it.
+          Create an equipment category first, then add machines against it.
         </p>
       )}
 
@@ -63,7 +63,7 @@ export default function Assets() {
               </tr>
             ))}
             {assets.length === 0 && (
-              <tr><td colSpan={5} style={{ color: "var(--text-muted)", textAlign: "center", padding: 24 }}>No assets yet.</td></tr>
+              <tr><td colSpan={5} style={{ color: "var(--text-muted)", textAlign: "center", padding: 24 }}>No machines yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -111,7 +111,7 @@ function AssetForm({ categories, onSaved }: { categories: EquipmentCategory[]; o
           </select>
         </div>
         <div className="field-group">
-          <label className="field">Internal code / asset ID</label>
+          <label className="field">Internal code / machine ID</label>
           <input className="input" value={internalCode} onChange={(e) => setInternalCode(e.target.value)} />
         </div>
         <div />
@@ -145,7 +145,7 @@ function AssetForm({ categories, onSaved }: { categories: EquipmentCategory[]; o
       )}
 
       <button className="btn btn-primary" onClick={submit} disabled={saving || !internalCode || !categoryId}>
-        {saving ? "Saving…" : "Save asset"}
+        {saving ? "Saving…" : "Save machine"}
       </button>
     </div>
   );

@@ -21,6 +21,7 @@ export interface Customer {
   name: string;
   customer_type: string;
   tax_id: string | null;
+  phone: string | null;
   billing_address: string | null;
   credit_limit: number | null;
   payment_terms_days: number;
@@ -95,7 +96,70 @@ export interface RentalContract {
   rate: number;
   start_date: string;
   end_date: string | null;
+  diesel_included: boolean;
   status: string;
+}
+
+export interface DailyEntry {
+  id: string;
+  entry_date: string;
+  due_date: string;
+  asset_id: string;
+  contract_id: string | null;
+  customer_name_freeform: string | null;
+  customer_id: string | null;
+  customer_phone: string | null;
+  site_name: string | null;
+  billing_type: string;
+  hours_worked: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  rate: number | null;
+  amount: number;
+  amount_paid: number;
+  diesel_included: boolean;
+  diesel_liters: number | null;
+  diesel_cost: number | null;
+  payment_status: string;
+  notes: string | null;
+}
+
+export interface Expense {
+  id: string;
+  expense_date: string;
+  category: string;
+  asset_id: string | null;
+  vendor: string | null;
+  amount: number;
+  payment_method: string;
+  notes: string | null;
+  receipt_url: string | null;
+}
+
+export interface SalaryPayment {
+  id: string;
+  operator_id: string | null;
+  staff_name: string;
+  pay_period_start: string;
+  pay_period_end: string;
+  amount: number;
+  paid_date: string | null;
+  payment_method: string;
+  notes: string | null;
+}
+
+export interface MaintenanceRecord {
+  id: string;
+  asset_id: string;
+  maintenance_date: string;
+  type: string;
+  meter_reading: number | null;
+  cost: number;
+  vendor: string | null;
+  description: string | null;
+  next_due_date: string | null;
+  next_due_meter: number | null;
+  receipt_url: string | null;
 }
 
 export interface Invoice {

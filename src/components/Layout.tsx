@@ -3,11 +3,17 @@ import { useAuth } from "../lib/AuthContext";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
+  { to: "/daily-sales", label: "Sales" },
+  { to: "/receivables", label: "Receivables" },
+  { to: "/expenses", label: "Expenses" },
+  { to: "/salaries", label: "Salaries" },
+  { to: "/maintenance", label: "Maintenance" },
+  { to: "/reports/monthly", label: "Monthly report" },
+  { to: "/rentals", label: "Contracts (optional)" },
+  { to: "/machines", label: "Machines" },
   { to: "/customers", label: "Customers" },
-  { to: "/equipment-categories", label: "Equipment categories" },
-  { to: "/assets", label: "Assets" },
-  { to: "/rentals", label: "Rentals" },
   { to: "/invoices", label: "Invoices" },
+  { to: "/equipment-categories", label: "Equipment categories" },
   { to: "/settings", label: "Settings" },
 ];
 

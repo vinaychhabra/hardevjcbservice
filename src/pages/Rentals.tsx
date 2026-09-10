@@ -3,8 +3,8 @@ import { supabase } from "../lib/supabase";
 import { Asset, Customer, RentalContract } from "../types";
 import { useAuth } from "../lib/AuthContext";
 
-const CONTRACT_TYPES = ["one_off", "recurring", "fixed_monthly", "meter_based", "project"];
-const BILLING_UNITS = ["hour", "day", "week", "month", "km", "cycle", "fixed"];
+const CONTRACT_TYPES = ["hourly", "fixed_daily", "fixed_monthly"];
+const BILLING_UNITS = ["hour", "day", "month"];
 
 export default function Rentals() {
   const { hasPermission } = useAuth();
@@ -41,7 +41,7 @@ export default function Rentals() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22 }}>Rental contracts</h1>
+        <div><h1 style={{ fontSize: 22, marginBottom: 4 }}>Formal contracts</h1><p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>Optional: use this for customers who require a written rental agreement. For normal jobs, use Sales.</p></div>
         {hasPermission("rentals.write") && (
           <button className="btn btn-primary" onClick={() => setShowForm((s) => !s)} disabled={!customers.length || !assets.length}>
             {showForm ? "Cancel" : "New contract"}
@@ -49,7 +49,7 @@ export default function Rentals() {
         )}
       </div>
       {(!customers.length || !assets.length) && (
-        <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>Add a customer and an asset first.</p>
+        <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>Add a customer and a machine first.</p>
       )}
 
       {showForm && (
@@ -64,7 +64,7 @@ export default function Rentals() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Contract #</th><th>Customer</th><th>Asset</th><th>Type</th><th>Rate</th><th>Start</th><th>Status</th><th></th>
+              <th>Contract #</th><th>Customer</th><th>Machine</th><th>Type</th><th>Rate</th><th>Diesel</th><th>Start</th><th>Status</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -75,6 +75,7 @@ export default function Rentals() {
                 <td className="mono">{assetCode(c.asset_id)}</td>
                 <td>{c.contract_type.replace("_", " ")}</td>
                 <td>₹{c.rate.toLocaleString()} / {c.billing_unit}</td>
+                <td>{c.diesel_included ? "Included" : "Excluded"}</td>
                 <td>{c.start_date}</td>
                 <td><span className={`status-chip status-${c.status === "active" ? "on_rent" : c.status}`}>{c.status}</span></td>
                 <td>
@@ -88,7 +89,7 @@ export default function Rentals() {
               </tr>
             ))}
             {contracts.length === 0 && (
-              <tr><td colSpan={8} style={{ color: "var(--text-muted)", textAlign: "center", padding: 24 }}>No contracts yet.</td></tr>
+              <tr><td colSpan={9} style={{ color: "var(--text-muted)", textAlign: "center", padding: 24 }}>No contracts yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -100,9 +101,10 @@ export default function Rentals() {
 function ContractForm({ customers, assets, onSaved }: { customers: Customer[]; assets: Asset[]; onSaved: () => void }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
   const [assetId, setAssetId] = useState(assets[0]?.id ?? "");
-  const [contractType, setContractType] = useState("one_off");
-  const [billingUnit, setBillingUnit] = useState("day");
+  const [contractType, setContractType] = useState("hourly");
+  const [billingUnit, setBillingUnit] = useState("hour");
   const [rate, setRate] = useState("");
+  const [dieselIncluded, setDieselIncluded] = useState(true);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState("");
   const [saving, setSaving] = useState(false);
@@ -120,6 +122,7 @@ function ContractForm({ customers, assets, onSaved }: { customers: Customer[]; a
       rate: Number(rate),
       start_date: startDate,
       end_date: endDate || null,
+      diesel_included: dieselIncluded,
       status: "active",
     });
     setSaving(false);
@@ -142,7 +145,7 @@ function ContractForm({ customers, assets, onSaved }: { customers: Customer[]; a
           </select>
         </div>
         <div className="field-group">
-          <label className="field">Asset</label>
+          <label className="field">Machine</label>
           <select className="input" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
             {assets.map((a) => <option key={a.id} value={a.id}>{a.internal_code}</option>)}
           </select>
@@ -162,6 +165,13 @@ function ContractForm({ customers, assets, onSaved }: { customers: Customer[]; a
         <div className="field-group">
           <label className="field">Rate</label>
           <input className="input" type="number" value={rate} onChange={(e) => setRate(e.target.value)} />
+        </div>
+        <div className="field-group">
+          <label className="field">Diesel</label>
+          <select className="input" value={dieselIncluded ? "included" : "excluded"} onChange={(e) => setDieselIncluded(e.target.value === "included")}>
+            <option value="included">Included in rate</option>
+            <option value="excluded">Not included (customer arranges/pays)</option>
+          </select>
         </div>
         <div className="field-group">
           <label className="field">Start date</label>

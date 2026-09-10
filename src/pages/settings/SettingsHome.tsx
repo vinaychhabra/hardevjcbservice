@@ -4,6 +4,7 @@ const SECTIONS = [
   { to: "/settings/billing-units", title: "Billing units & tax", desc: "Which billing units are enabled, default tax rates, grace periods." },
   { to: "/settings/numbering", title: "Document numbering", desc: "Prefix and sequence for invoices and quotes." },
   { to: "/settings/roles-users", title: "Roles & users", desc: "Who has access, and what each role can do." },
+  { to: "/settings/field-requirements", title: "Field requirements", desc: "Choose whether customer and Sales contact fields are required." },
 ];
 
 export default function SettingsHome() {
