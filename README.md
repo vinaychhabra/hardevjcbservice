@@ -89,7 +89,7 @@ to do this from the Settings UI instead.
 
 ## What's next (see phase plan)
 
-Phase 2 (recurring billing, expenses, maintenance, reports) and beyond
+Phase 2 (recurring billing, expenses, reports) and beyond
 will need a small number of **Supabase Edge Functions** — not a full
 backend server, just serverless functions for anything that needs a
 schedule (cron), a secret API key (WhatsApp, AI), or a webhook.

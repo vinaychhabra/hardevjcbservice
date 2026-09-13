@@ -11,14 +11,15 @@ import Rentals from "./pages/Rentals";
 import Invoices from "./pages/Invoices";
 import DailySales from "./pages/DailySales";
 import Expenses from "./pages/Expenses";
+import Employees from "./pages/Employees";
 import Salaries from "./pages/Salaries";
-import Maintenance from "./pages/Maintenance";
 import MonthlyReport from "./pages/MonthlyReport";
 import Receivables from "./pages/Receivables";
 import SettingsHome from "./pages/settings/SettingsHome";
 import BillingUnitsSettings from "./pages/settings/BillingUnitsSettings";
 import RolesUsersSettings from "./pages/settings/RolesUsersSettings";
 import NumberingSettings from "./pages/settings/NumberingSettings";
+import EmployeePayrollSettings from "./pages/settings/EmployeePayrollSettings";
 import FieldRequirementsSettings from "./pages/settings/FieldRequirementsSettings";
 
 function Protected({ children }: { children: JSX.Element }) {
@@ -49,15 +50,16 @@ export default function App() {
         <Route path="rentals" element={<Rentals />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="daily-sales" element={<DailySales />} />
+        <Route path="employees" element={<Employees />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="salaries" element={<Salaries />} />
-        <Route path="maintenance" element={<Maintenance />} />
         <Route path="reports/monthly" element={<MonthlyReport />} />
         <Route path="receivables" element={<Receivables />} />
         <Route path="settings" element={<SettingsHome />} />
         <Route path="settings/billing-units" element={<BillingUnitsSettings />} />
         <Route path="settings/roles-users" element={<RolesUsersSettings />} />
         <Route path="settings/numbering" element={<NumberingSettings />} />
+        <Route path="settings/employee-payroll" element={<EmployeePayrollSettings />} />
         <Route path="settings/field-requirements" element={<FieldRequirementsSettings />} />
       </Route>
     </Routes>

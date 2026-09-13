@@ -21,13 +21,14 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--graphite-900)" }}>
-      <form onSubmit={handleSubmit} className="panel" style={{ width: 360, padding: 32 }}>
-        <h1 style={{ fontSize: 20, marginBottom: 4 }}>EquipRent OS</h1>
-        <p style={{ color: "var(--text-muted)", marginBottom: 24, fontSize: 13 }}>Sign in to your account</p>
+    <div className="auth-shell">
+      <form onSubmit={handleSubmit} className="auth-card">
+        <div className="auth-badge">Hardev JCB</div>
+        <h1>Welcome back</h1>
+        <p>Sign in to your operations workspace.</p>
 
         {error && (
-          <div style={{ background: "#f6e4e4", color: "var(--red)", padding: "8px 12px", borderRadius: 4, marginBottom: 16, fontSize: 13 }}>
+          <div style={{ background: "rgba(198, 61, 66, 0.12)", color: "var(--danger)", padding: "10px 12px", borderRadius: 10, marginBottom: 16, fontSize: 13, fontWeight: 600 }}>
             {error}
           </div>
         )}
@@ -41,12 +42,12 @@ export default function Login() {
           <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
 
-        <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={submitting}>
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? "Signing in…" : "Sign in"}
         </button>
 
-        <p style={{ marginTop: 16, fontSize: 13, color: "var(--text-muted)" }}>
-          New here? <Link to="/signup">Create a company account</Link>
+        <p style={{ marginTop: 18, fontSize: 13 }}>
+          New here? <Link className="auth-link" to="/signup">Create a company account</Link>
         </p>
       </form>
     </div>

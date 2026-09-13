@@ -75,12 +75,31 @@ export interface Site {
 
 export interface Operator {
   id: string;
+  tenant_id?: string;
   name: string;
   phone: string | null;
+  email?: string | null;
   license_number: string | null;
+  driving_license_number?: string | null;
+  aadhaar_number?: string | null;
+  employee_role?: string | null;
+  designation?: string | null;
+  salary_amount?: number | null;
+  salary_frequency?: string | null;
+  advance_balance?: number | null;
+  join_date?: string | null;
+  notes?: string | null;
   license_expiry: string | null;
   skill_categories: string | null;
   daily_rate: number | null;
+  is_active: boolean;
+}
+
+export interface EmployeeRole {
+  id: string;
+  tenant_id: string;
+  name: string;
+  base_salary: number | null;
   is_active: boolean;
 }
 
@@ -143,23 +162,12 @@ export interface SalaryPayment {
   pay_period_start: string;
   pay_period_end: string;
   amount: number;
+  gross_amount?: number | null;
+  advance_adjustment?: number | null;
+  net_amount?: number | null;
   paid_date: string | null;
   payment_method: string;
   notes: string | null;
-}
-
-export interface MaintenanceRecord {
-  id: string;
-  asset_id: string;
-  maintenance_date: string;
-  type: string;
-  meter_reading: number | null;
-  cost: number;
-  vendor: string | null;
-  description: string | null;
-  next_due_date: string | null;
-  next_due_meter: number | null;
-  receipt_url: string | null;
 }
 
 export interface Invoice {

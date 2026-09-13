@@ -97,7 +97,7 @@ export default function DailySales() {
                 <td>{e.start_time && e.end_time ? `${e.start_time.slice(0, 5)} - ${e.end_time.slice(0, 5)}` : e.hours_worked != null ? `${e.hours_worked} h` : "—"}</td>
                 <td>₹{e.amount.toLocaleString()}</td>
                 <td>{e.diesel_included ? "Included" : e.diesel_cost ? `Extra ₹${e.diesel_cost}` : "Excluded"}</td>
-                <td><span className={`status-chip status-${e.payment_status === "paid" ? "available" : "maintenance"}`}>{e.payment_status}</span><div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(e)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this sale?")) { await supabase.from("daily_entries").delete().eq("id", e.id); load(); } }}>Delete</button></div></td>
+                <td><span className={`status-chip status-${e.payment_status === "paid" ? "available" : "pending"}`}>{e.payment_status}</span><div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(e)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this sale?")) { await supabase.from("daily_entries").delete().eq("id", e.id); load(); } }}>Delete</button></div></td>
               </tr>
             ))}
             {filteredEntries.length === 0 && (
@@ -141,16 +141,24 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
     setCustomerPhone(customer?.phone ?? "");
   }
 
-  function calculatedHours() {
-    if (!startTime || !endTime) return 0;
-    const [startHour, startMinute] = startTime.split(":").map(Number);
-    const [endHour, endMinute] = endTime.split(":").map(Number);
+  function minutesBetween(startValue: string, endValue: string) {
+    if (!startValue || !endValue) return 0;
+    const [startHour, startMinute] = startValue.split(":").map(Number);
+    const [endHour, endMinute] = endValue.split(":").map(Number);
     let difference = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
     if (difference < 0) difference += 24 * 60;
-    return difference / 60;
+    return difference;
   }
 
-  const effectiveHours = hoursMode === "time" ? calculatedHours() : Number(hours || 0);
+  function formatHoursForDisplay(decimalHours: number) {
+    const totalMinutes = Math.round(decimalHours * 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hrs}h ${mins}m`;
+  }
+
+  const effectiveMinutes = hoursMode === "time" ? minutesBetween(startTime, endTime) : Math.round((Number(hours || 0)) * 60);
+  const effectiveHours = effectiveMinutes / 60;
   const computedAmount = billingType === "hourly" && effectiveHours && rate ? effectiveHours * Number(rate) : Number(amount || 0);
 
   async function submit() {
@@ -245,7 +253,7 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
               <input className="input" type="number" value={rate} onChange={(e) => setRate(e.target.value)} />
             </div>
             <div className="field-group">
-              <label className="field">{hoursMode === "time" && effectiveHours ? `${effectiveHours.toFixed(2)} hours · amount` : "Amount (auto)"}</label>
+              <label className="field">{hoursMode === "time" && effectiveMinutes ? `${formatHoursForDisplay(effectiveHours)} · amount` : "Amount (auto)"}</label>
               <input className="input" value={`₹${computedAmount.toLocaleString()}`} disabled />
             </div>
           </>

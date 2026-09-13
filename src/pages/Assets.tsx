@@ -5,7 +5,7 @@ import { useAuth } from "../lib/AuthContext";
 
 const STATUSES = [
   "available", "reserved", "quoted_held", "dispatched", "on_rent", "on_site",
-  "returning", "inspection", "maintenance", "breakdown", "lost_missing", "sold", "inactive",
+  "returning", "inspection", "breakdown", "lost_missing", "sold", "inactive",
 ];
 
 export default function Assets() {

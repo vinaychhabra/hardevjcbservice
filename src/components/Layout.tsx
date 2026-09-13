@@ -1,78 +1,155 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
 
-const NAV = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/daily-sales", label: "Sales" },
-  { to: "/receivables", label: "Receivables" },
-  { to: "/expenses", label: "Expenses" },
-  { to: "/salaries", label: "Salaries" },
-  { to: "/maintenance", label: "Maintenance" },
-  { to: "/reports/monthly", label: "Monthly report" },
-  { to: "/rentals", label: "Contracts (optional)" },
-  { to: "/machines", label: "Machines" },
-  { to: "/customers", label: "Customers" },
-  { to: "/invoices", label: "Invoices" },
-  { to: "/equipment-categories", label: "Equipment categories" },
-  { to: "/settings", label: "Settings" },
+const MAIN_NAV = [
+  { title: "Overview", items: [{ to: "/", label: "Dashboard", end: true } as { to: string; label: string; end?: boolean }] },
+  {
+    title: "Operations",
+    items: [
+      { to: "/daily-sales", label: "Sales" },
+      { to: "/employees", label: "Employees" },
+      { to: "/rentals", label: "Contracts" },
+      { to: "/machines", label: "Machines" },
+      { to: "/customers", label: "Customers" },
+      { to: "/invoices", label: "Invoices" },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { to: "/receivables", label: "Receivables" },
+      { to: "/expenses", label: "Expenses" },
+      { to: "/salaries", label: "Salaries" },
+    ],
+  },
+  {
+    title: "Reports & setup",
+    items: [
+      { to: "/reports/monthly", label: "Monthly report" },
+      { to: "/equipment-categories", label: "Equipment categories" },
+    ],
+  },
 ];
 
 export default function Layout() {
   const { profile, signOut } = useAuth();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    Overview: true,
+    Finance: true,
+    Operations: true,
+    "Reports & setup": true,
+  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const stored = localStorage.getItem("equiprent-theme");
+    if (stored === "light" || stored === "dark") return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("equiprent-theme", theme);
+  }, [theme]);
+
+  function toggleGroup(title: string) {
+    setExpanded((prev) => ({ ...prev, [title]: !prev[title] }));
+  }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          width: 220,
-          background: "var(--graphite-800)",
-          color: "#fff",
-          padding: "20px 0",
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ padding: "0 20px 24px", fontWeight: 800, fontSize: 16, letterSpacing: 0.2 }}>
-          EquipRent OS
+    <div className="app-shell">
+      <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+        <div className="brand-wrap">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSidebarCollapsed((current) => !current)}
+          >
+            ☰
+          </button>
+
+          {!sidebarCollapsed && (
+            <div>
+              <div className="brand-name">Hardev JCB</div>
+              <div className="brand-subtitle">Operations Suite</div>
+            </div>
+          )}
         </div>
-        <nav style={{ flex: 1 }}>
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              style={({ isActive }) => ({
-                display: "block",
-                padding: "10px 20px",
-                color: isActive ? "var(--amber)" : "rgba(255,255,255,0.8)",
-                fontWeight: isActive ? 700 : 500,
-                fontSize: 13,
-                textDecoration: "none",
-                borderLeft: isActive ? "3px solid var(--amber)" : "3px solid transparent",
-              })}
-            >
-              {item.label}
-            </NavLink>
+
+        <nav className="sidebar-nav" aria-label="Primary navigation">
+          {MAIN_NAV.map((group) => (
+            <div key={group.title} className="nav-group">
+              <button type="button" className="nav-group-toggle" onClick={() => toggleGroup(group.title)}>
+                {!sidebarCollapsed && <span>{group.title}</span>}
+                <span>{expanded[group.title] ? "▾" : "▸"}</span>
+              </button>
+
+              {expanded[group.title] && (
+                <div className="nav-group-items">
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end ?? false}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
-        <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>{profile?.full_name}</div>
-          <button
-            onClick={signOut}
-            className="btn"
-            style={{ marginTop: 8, width: "100%", background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,0.3)" }}
+
+        <div className="sidebar-footer">
+          <NavLink
+            to="/settings"
+            title={sidebarCollapsed ? "Settings" : undefined}
+            className={({ isActive }) => `nav-link settings-link ${isActive ? "active" : ""}`}
           >
-            Sign out
-          </button>
+            Settings
+          </NavLink>
+
+          {!sidebarCollapsed && (
+            <div className="user-card">
+              <div>
+                <div className="user-label">Signed in</div>
+                <div className="user-name">{profile?.full_name || "User"}</div>
+              </div>
+              <button type="button" className="btn btn-ghost btn-block" onClick={signOut}>
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </aside>
-      <main style={{ flex: 1, padding: 32, maxWidth: 1200 }}>
-        <Outlet />
+
+      <main className="content-area">
+        <header className="topbar">
+          <div>
+            <h1 className="page-title">Overview</h1>
+          </div>
+
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="theme-toggle"
+              aria-label="Toggle color theme"
+              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+            >
+              <span>{theme === "light" ? "☀️" : "🌙"}</span>
+              <span>{theme === "light" ? "Light" : "Dark"}</span>
+            </button>
+          </div>
+        </header>
+
+        <div className="page-shell">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
 }
-
-//https://dclhnujrgcmupijsefak.supabase.co
-//sb_publishable_sNKpDUpxmFsLMtHKuh4cCw_EQbR01Wx

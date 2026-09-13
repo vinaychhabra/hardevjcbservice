@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export async function uploadFinanceAttachment(file: File, recordType: "expense" | "maintenance", recordId: string) {
+export async function uploadFinanceAttachment(file: File, recordType: "expense", recordId: string) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error("Not signed in");
   const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userData.user.id).single();
