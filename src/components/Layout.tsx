@@ -8,6 +8,7 @@ const MAIN_NAV = [
     title: "Operations",
     items: [
       { to: "/daily-sales", label: "Sales" },
+      { to: "/discrepancy-review", label: "Review list" },
       { to: "/employees", label: "Employees" },
       { to: "/rentals", label: "Contracts" },
       { to: "/machines", label: "Machines" },

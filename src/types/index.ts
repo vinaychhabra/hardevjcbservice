@@ -57,6 +57,14 @@ export interface Asset {
   year: number | null;
   serial_number: string | null;
   registration_number: string | null;
+  registration_certificate_number: string | null;
+  registration_certificate_expiry_date: string | null;
+  insurance_policy_number: string | null;
+  insurance_expiry_date: string | null;
+  last_service_date: string | null;
+  last_service_hours: number | null;
+  next_service_due_hours: number | null;
+  last_service_notes: string | null;
   status: string;
   current_meter_reading: number;
   meter_type: string;
@@ -116,6 +124,9 @@ export interface RentalContract {
   start_date: string;
   end_date: string | null;
   diesel_included: boolean;
+  notes: string | null;
+  discount_amount: number | null;
+  completed_date: string | null;
   status: string;
 }
 
@@ -133,6 +144,12 @@ export interface DailyEntry {
   hours_worked: number | null;
   start_time: string | null;
   end_time: string | null;
+  office_departure_time: string | null;
+  office_return_time: string | null;
+  discrepancy_flag: boolean;
+  discrepancy_note: string | null;
+  is_reviewed: boolean;
+  reviewed_at: string | null;
   rate: number | null;
   amount: number;
   amount_paid: number;

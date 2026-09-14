@@ -1,30 +1,151 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Operator, SalaryPayment } from "../types";
 import { useAuth } from "../lib/AuthContext";
+import { getSetting } from "../lib/settingsApi";
+
+interface SalaryPolicy {
+  roles: string[];
+  default_salary_frequency: string;
+  default_salary_amount: number;
+  default_salary_day: number;
+  salary_grace_days: number;
+  reminder_enabled: boolean;
+}
+
+const DEFAULT_POLICY: SalaryPolicy = {
+  roles: ["Driver", "Operator", "Helper", "Supervisor", "Mechanic", "Accountant"],
+  default_salary_frequency: "monthly",
+  default_salary_amount: 0,
+  default_salary_day: 7,
+  salary_grace_days: 2,
+  reminder_enabled: true,
+};
+
+function formatCurrency(value: number) {
+  return `₹${value.toLocaleString()}`;
+}
+
+function monthKey(date: Date) {
+  return date.toISOString().slice(0, 7);
+}
+
+function getNextPayday(date: Date, cycle: string, salaryDay: number) {
+  const safeDay = Math.min(Math.max(Number(salaryDay) || 7, 1), 31);
+  const next = new Date(date);
+
+  if (cycle === "daily") {
+    next.setDate(next.getDate() + 1);
+    return next;
+  }
+
+  if (cycle === "weekly") {
+    next.setDate(next.getDate() + ((7 - next.getDay() + 1) % 7 || 7));
+    return next;
+  }
+
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  const monthDay = Math.min(safeDay, lastDay);
+  const monthDate = new Date(next.getFullYear(), next.getMonth(), monthDay);
+
+  if (monthDate < next) {
+    monthDate.setMonth(monthDate.getMonth() + 1);
+  }
+
+  return monthDate;
+}
 
 export default function Salaries() {
   const { hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const [payments, setPayments] = useState<SalaryPayment[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
+  const [policy, setPolicy] = useState<SalaryPolicy>(DEFAULT_POLICY);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalaryPayment | null>(null);
+  const [quickPay, setQuickPay] = useState<{ employeeId?: string; name?: string; amount?: number } | null>(null);
 
   async function load() {
-    const [{ data: p }, { data: o }] = await Promise.all([
-      supabase.from("salary_payments").select("*").order("pay_period_start", { ascending: false }).limit(100),
+    const [salaryResult, operatorsResult, settingsResult] = await Promise.all([
+      supabase.from("salary_payments").select("*").order("paid_date", { ascending: false }).limit(100),
       supabase.from("operators").select("*").order("name"),
+      getSetting<SalaryPolicy>("employee_roles", "config", DEFAULT_POLICY),
     ]);
-    setPayments((p ?? []) as SalaryPayment[]);
-    setOperators((o ?? []) as Operator[]);
+
+    setPayments((salaryResult.data ?? []) as SalaryPayment[]);
+    setOperators((operatorsResult.data ?? []) as Operator[]);
+    setPolicy({ ...DEFAULT_POLICY, ...settingsResult });
   }
 
   useEffect(() => { load(); }, []);
 
-  const monthStr = new Date().toISOString().slice(0, 7);
-  const monthTotal = payments
-    .filter((p) => (p.pay_period_start ?? "").startsWith(monthStr) || (p.paid_date ?? "").startsWith(monthStr))
-    .reduce((s, p) => s + Number(p.net_amount ?? p.gross_amount ?? p.amount ?? 0), 0);
+  const currentMonthKey = monthKey(new Date());
+  const activeEmployees = useMemo(
+    () => operators.filter((employee) => employee.is_active !== false && Number(employee.salary_amount ?? 0) > 0),
+    [operators],
+  );
+
+  const monthPaid = payments
+    .filter((payment) => {
+      const paidDate = payment.paid_date ?? payment.pay_period_end ?? payment.pay_period_start;
+      return paidDate && paidDate.startsWith(currentMonthKey);
+    })
+    .reduce((sum, payment) => sum + Number(payment.net_amount ?? payment.gross_amount ?? payment.amount ?? 0), 0);
+
+  const pendingRows = useMemo(() => {
+    return activeEmployees
+      .map((employee) => {
+        const salaryAmount = Number(employee.salary_amount ?? 0);
+        const cycle = employee.salary_frequency ?? policy.default_salary_frequency ?? "monthly";
+        const paidThisCycle = payments
+          .filter((payment) => payment.operator_id === employee.id)
+          .filter((payment) => {
+            const sourceDate = payment.paid_date ?? payment.pay_period_end ?? payment.pay_period_start;
+            return sourceDate && sourceDate.startsWith(currentMonthKey);
+          })
+          .reduce((sum, payment) => sum + Number(payment.net_amount ?? payment.gross_amount ?? payment.amount ?? 0), 0);
+
+        const due = Math.max(salaryAmount - paidThisCycle, 0);
+        const status = paidThisCycle > 0 && paidThisCycle < salaryAmount ? "partial" : "pending";
+
+        return {
+          employee,
+          cycle,
+          nextPayday: getNextPayday(new Date(), cycle, policy.default_salary_day),
+          due,
+          status,
+          paidThisCycle,
+        };
+      })
+      .filter((row) => row.due > 0)
+      .sort((a, b) => a.nextPayday.getTime() - b.nextPayday.getTime());
+  }, [activeEmployees, currentMonthKey, payments, policy.default_salary_day, policy.default_salary_frequency]);
+
+  const pendingCount = pendingRows.filter((row) => row.status === "pending").length;
+  const partialCount = pendingRows.filter((row) => row.status === "partial").length;
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "salary") return;
+
+    const firstPending = pendingRows[0];
+    const employeeId = searchParams.get("employeeId") ?? firstPending?.employee.id ?? "";
+    const employeeName = searchParams.get("employeeName") ?? firstPending?.employee.name ?? "";
+    const amount = Number(searchParams.get("amount") ?? firstPending?.due ?? 0);
+
+    if (employeeId || employeeName || amount > 0) {
+      setShowForm(true);
+      setQuickPay({
+        employeeId: employeeId || firstPending?.employee.id,
+        name: employeeName || firstPending?.employee.name,
+        amount: amount || firstPending?.due || 0,
+      });
+    }
+  }, [pendingRows, searchParams]);
+
+  const totalPayrollCommitment = activeEmployees.reduce((sum, employee) => sum + Number(employee.salary_amount ?? 0), 0);
+  const pendingTotal = pendingRows.reduce((sum, row) => sum + row.due, 0);
+  const nextPayday = pendingRows[0]?.nextPayday ?? getNextPayday(new Date(), policy.default_salary_frequency, policy.default_salary_day);
 
   return (
     <div>
@@ -35,13 +156,101 @@ export default function Salaries() {
         )}
       </div>
 
-      <div className="panel" style={{ padding: 16, marginBottom: 20, maxWidth: 240 }}>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Paid this month</div>
-        <div style={{ fontSize: 24, fontWeight: 800 }}>₹{monthTotal.toLocaleString()}</div>
+      <div className="summary-grid">
+        <div className="panel" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Payroll commitment</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{formatCurrency(totalPayrollCommitment)}</div>
+        </div>
+        <div className="panel" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Paid this month</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{formatCurrency(monthPaid)}</div>
+        </div>
+        <div className="panel" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Pending salaries</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{formatCurrency(pendingTotal)}</div>
+        </div>
+        <div className="panel" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Next payday</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{nextPayday.toLocaleDateString()}</div>
+        </div>
       </div>
 
-      {showForm && <SalaryForm key="new" operators={operators} onSaved={() => { setShowForm(false); load(); }} />}
+      {pendingRows.length > 0 && (
+        <div className="panel alert-banner">
+          <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--warning)" }}>Salary alert</div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>
+            {pendingRows.length} employee{pendingRows.length > 1 ? "s" : ""} still need {formatCurrency(pendingTotal)} payment.
+          </div>
+          <div style={{ color: "var(--text-muted)", marginTop: 4 }}>
+            {pendingCount > 0 ? `${pendingCount} pending, ` : ""}{partialCount > 0 ? `${partialCount} partial` : ""} • next payout planned for {nextPayday.toLocaleDateString()}.
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <SalaryForm
+          key={quickPay ? `quick-${quickPay.employeeId ?? "manual"}-${quickPay.amount ?? "0"}` : "new"}
+          operators={operators}
+          prefill={quickPay ?? undefined}
+          onSaved={() => { setShowForm(false); setQuickPay(null); load(); }}
+          onCancel={() => { setShowForm(false); setQuickPay(null); }}
+        />
+      )}
       {editing && <SalaryForm key={editing.id} operators={operators} payment={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
+
+      {pendingRows.length > 0 && (
+        <div className="panel" style={{ padding: 14, marginBottom: 20 }}>
+          <h2 style={{ margin: "0 0 12px", fontSize: 16 }}>Pending salary list</h2>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Cycle</th>
+                <th>Salary</th>
+                <th>Due date</th>
+                <th>Due amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingRows.map(({ employee, cycle, nextPayday: payday, due, status }) => (
+                <tr
+                  key={employee.id}
+                  onClick={() => {
+                    setQuickPay({ employeeId: employee.id, name: employee.name, amount: due });
+                    setShowForm(true);
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Click to record this pending salary"
+                >
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>{employee.name}</span>
+                      <span
+                        className="status-chip"
+                        style={{
+                          background: status === "partial" ? "rgba(245, 158, 11, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                          color: status === "partial" ? "var(--warning)" : "var(--danger)",
+                          border: "none",
+                          fontSize: 10,
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  </td>
+                  <td>{cycle}</td>
+                  <td>{formatCurrency(Number(employee.salary_amount ?? 0))}</td>
+                  <td>{payday.toLocaleDateString()}</td>
+                  <td style={{ fontWeight: 700 }}>{formatCurrency(due)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="panel">
         <table className="data-table">
@@ -51,9 +260,9 @@ export default function Salaries() {
               <tr key={p.id}>
                 <td>{p.staff_name}</td>
                 <td>{p.pay_period_start} → {p.pay_period_end}</td>
-                <td>₹{Number(p.gross_amount ?? p.amount).toLocaleString()}</td>
-                <td>₹{Number(p.advance_adjustment ?? 0).toLocaleString()}</td>
-                <td>₹{Number(p.net_amount ?? p.amount).toLocaleString()}</td>
+                <td>{formatCurrency(Number(p.gross_amount ?? p.amount))}</td>
+                <td>{formatCurrency(Number(p.advance_adjustment ?? 0))}</td>
+                <td>{formatCurrency(Number(p.net_amount ?? p.amount))}</td>
                 <td>{p.paid_date ?? "—"}</td>
                 <td>{p.payment_method.replace("_", " ")}<div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(p)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this salary payment?")) { await supabase.from("salary_payments").delete().eq("id", p.id); load(); } }}>Delete</button></div></td>
               </tr>
@@ -66,9 +275,10 @@ export default function Salaries() {
   );
 }
 
-function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Operator[]; payment?: SalaryPayment; onSaved: () => void; onCancel?: () => void }) {
-  const [operatorId, setOperatorId] = useState(payment?.operator_id ?? "");
-  const [staffName, setStaffName] = useState(payment?.staff_name ?? "");
+function SalaryForm({ operators, payment, prefill, onSaved, onCancel }: { operators: Operator[]; payment?: SalaryPayment; prefill?: { employeeId?: string; name?: string; amount?: number }; onSaved: () => void; onCancel?: () => void }) {
+  const [operatorId, setOperatorId] = useState(payment?.operator_id ?? prefill?.employeeId ?? "");
+  const [staffName, setStaffName] = useState(payment?.staff_name ?? prefill?.name ?? "");
+  const [manualEntry, setManualEntry] = useState(!payment?.operator_id && !prefill?.employeeId);
   const [periodStart, setPeriodStart] = useState(payment?.pay_period_start ?? new Date().toISOString().slice(0, 8) + "01");
   const [periodEnd, setPeriodEnd] = useState(payment?.pay_period_end ?? new Date().toISOString().slice(0, 10));
   const [grossAmount, setGrossAmount] = useState(payment?.gross_amount?.toString() ?? payment?.amount?.toString() ?? "");
@@ -79,21 +289,52 @@ function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Oper
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!prefill) return;
+
+    if (prefill.employeeId) {
+      setOperatorId(prefill.employeeId);
+      setManualEntry(false);
+      setStaffName(prefill.name ?? staffName);
+    } else {
+      setOperatorId("");
+      setManualEntry(true);
+      if (prefill.name) setStaffName(prefill.name);
+    }
+
+    if (typeof prefill.amount === "number" && prefill.amount > 0) {
+      setGrossAmount(String(prefill.amount));
+    }
+  }, [prefill]);
+
   const netAmount = Math.max(0, Number(grossAmount || 0) - Number(advanceAdjustment || 0));
 
   function selectOperator(id: string) {
-    setOperatorId(id);
+    if (!id) {
+      setOperatorId("");
+      setManualEntry(true);
+      return;
+    }
+
     const op = operators.find((o) => o.id === id);
+    setOperatorId(id);
+    setManualEntry(false);
     if (op) setStaffName(op.name);
+  }
+
+  function toggleManualEntry() {
+    setManualEntry(true);
+    setOperatorId("");
   }
 
   async function submit() {
     setSaving(true);
     setError(null);
 
+    const finalStaffName = staffName.trim();
     const baseValues = {
       operator_id: operatorId || null,
-      staff_name: staffName,
+      staff_name: finalStaffName,
       pay_period_start: periodStart,
       pay_period_end: periodEnd,
       amount: Number(netAmount || 0),
@@ -102,7 +343,7 @@ function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Oper
       notes: notes || null,
     };
 
-    const { data: schemaCheck, error: schemaError } = await supabase.from("salary_payments").select("gross_amount, advance_adjustment, net_amount").limit(1);
+    const { error: schemaError } = await supabase.from("salary_payments").select("gross_amount, advance_adjustment, net_amount").limit(1);
     const values = { ...baseValues } as Record<string, any>;
 
     if (!schemaError) {
@@ -134,20 +375,25 @@ function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Oper
 
   return (
     <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         {operators.length > 0 && (
           <div className="field-group">
             <label className="field">Employee (optional)</label>
             <select className="input" value={operatorId} onChange={(e) => selectOperator(e.target.value)}>
-              <option value="">— type name manually —</option>
+              <option value="">— manual entry —</option>
               {operators.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
+            {operatorId && (
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn" style={{ padding: "6px 10px" }} onClick={toggleManualEntry}>Use manual name</button>
+              </div>
+            )}
           </div>
         )}
         <div className="field-group">
           <label className="field">Staff name</label>
-          <input className="input" value={staffName} onChange={(e) => setStaffName(e.target.value)} />
+          <input className="input" value={staffName} onChange={(e) => setStaffName(e.target.value)} disabled={!!operatorId && !manualEntry} />
         </div>
         <div className="field-group">
           <label className="field">Gross salary</label>
@@ -184,7 +430,7 @@ function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Oper
           <textarea className="input" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </div>
       </div>
-      <button className="btn btn-primary" onClick={submit} disabled={saving || !grossAmount || !staffName}>{saving ? "Saving…" : payment ? "Update payment" : "Save payment"}</button>{onCancel && <button className="btn" onClick={onCancel} style={{ marginLeft: 8 }}>Cancel</button>}
+      <button className="btn btn-primary" onClick={submit} disabled={saving || !grossAmount || !staffName.trim()}>{saving ? "Saving…" : payment ? "Update payment" : "Save payment"}</button>{onCancel && <button className="btn" onClick={onCancel} style={{ marginLeft: 8 }}>Cancel</button>}
     </div>
   );
 }

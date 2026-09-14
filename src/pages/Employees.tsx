@@ -108,7 +108,22 @@ export default function Employees() {
                       <button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(employee)}>Edit</button>
                     )}
                     {hasPermission("operators.write") && (
-                      <button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this employee?")) { await supabase.from("operators").delete().eq("id", employee.id); load(); } }}>Delete</button>
+                      <button className="btn" style={{ padding: "3px 7px" }} onClick={async () => {
+                        if (!window.confirm("Delete this employee?")) return;
+
+                        const { error: salaryLinkError } = await supabase
+                          .from("salary_payments")
+                          .update({ operator_id: null })
+                          .eq("operator_id", employee.id);
+
+                        if (salaryLinkError) {
+                          window.alert(`Could not detach salary records before deleting this employee: ${salaryLinkError.message}`);
+                          return;
+                        }
+
+                        await supabase.from("operators").delete().eq("id", employee.id);
+                        load();
+                      }}>Delete</button>
                     )}
                   </div>
                 </td>

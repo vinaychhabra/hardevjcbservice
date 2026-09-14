@@ -15,6 +15,7 @@ import Employees from "./pages/Employees";
 import Salaries from "./pages/Salaries";
 import MonthlyReport from "./pages/MonthlyReport";
 import Receivables from "./pages/Receivables";
+import DiscrepancyReview from "./pages/DiscrepancyReview";
 import SettingsHome from "./pages/settings/SettingsHome";
 import BillingUnitsSettings from "./pages/settings/BillingUnitsSettings";
 import RolesUsersSettings from "./pages/settings/RolesUsersSettings";
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="expenses" element={<Expenses />} />
         <Route path="salaries" element={<Salaries />} />
         <Route path="reports/monthly" element={<MonthlyReport />} />
+        <Route path="discrepancy-review" element={<DiscrepancyReview />} />
         <Route path="receivables" element={<Receivables />} />
         <Route path="settings" element={<SettingsHome />} />
         <Route path="settings/billing-units" element={<BillingUnitsSettings />} />

@@ -55,9 +55,9 @@ begin
   update public.daily_entries
   set amount_paid = amount_paid + new.amount,
       payment_status = case
-        when amount_paid + new.amount >= amount then 'paid'
+        when amount_paid + new.amount >= (amount + case when diesel_included then 0 else coalesce(diesel_cost, 0) end) then 'paid'
         when amount_paid + new.amount > 0 then 'partially_paid'
-        else payment_status
+        else 'pending'
       end
   where id = new.daily_entry_id and tenant_id = new.tenant_id;
   return new;

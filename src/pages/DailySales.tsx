@@ -43,6 +43,7 @@ export default function DailySales() {
   const todayTotal = filteredEntries.filter((e) => e.entry_date === todayStr).reduce((s, e) => s + e.amount, 0);
   const monthStr = todayStr.slice(0, 7);
   const monthTotal = filteredEntries.filter((e) => e.entry_date.startsWith(monthStr)).reduce((s, e) => s + e.amount, 0);
+  const discrepancyCount = filteredEntries.filter((e) => e.discrepancy_flag).length;
 
   return (
     <div>
@@ -60,7 +61,7 @@ export default function DailySales() {
       </p>
       {loadError && <div className="panel" style={{ padding: 12, marginBottom: 16, color: "var(--red)" }}>{loadError}</div>}
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
         <div className="panel" style={{ padding: 16, minWidth: 160 }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Today</div>
           <div style={{ fontSize: 24, fontWeight: 800 }}>₹{todayTotal.toLocaleString()}</div>
@@ -68,6 +69,10 @@ export default function DailySales() {
         <div className="panel" style={{ padding: 16, minWidth: 160 }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>This month</div>
           <div style={{ fontSize: 24, fontWeight: 800 }}>₹{monthTotal.toLocaleString()}</div>
+        </div>
+        <div className="panel" style={{ padding: 16, minWidth: 180, border: discrepancyCount ? "1px solid rgba(220, 38, 38, 0.5)" : undefined }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Discrepancy review</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: discrepancyCount ? "var(--danger)" : "var(--success)" }}>{discrepancyCount}</div>
         </div>
       </div>
 
@@ -94,7 +99,19 @@ export default function DailySales() {
                 <td data-label="Machine" className="mono">{assetCode(e.asset_id)}</td>
                 <td data-label="Customer / site">{[e.customer_name_freeform, e.site_name].filter(Boolean).join(" · ") || "—"}</td>
                 <td data-label="Billing">{e.billing_type.replace("_", " ")}</td>
-                <td data-label="Time / hours">{e.start_time && e.end_time ? `${e.start_time.slice(0, 5)} - ${e.end_time.slice(0, 5)}` : e.hours_worked != null ? `${e.hours_worked} h` : "—"}</td>
+                <td data-label="Time / hours">
+                  <div>{e.start_time && e.end_time ? `${e.start_time.slice(0, 5)} - ${e.end_time.slice(0, 5)}` : e.hours_worked != null ? `${e.hours_worked} h` : "—"}</div>
+                  {(e.office_departure_time || e.office_return_time) && (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                      Office: {e.office_departure_time ? e.office_departure_time.slice(0, 5) : "—"} - {e.office_return_time ? e.office_return_time.slice(0, 5) : "—"}
+                    </div>
+                  )}
+                  {e.discrepancy_flag && (
+                    <div style={{ fontSize: 11, color: "var(--danger)", marginTop: 5, fontWeight: 700 }}>
+                      Review flag: {e.discrepancy_note || "Discrepancy"}
+                    </div>
+                  )}
+                </td>
                 <td data-label="Amount">₹{e.amount.toLocaleString()}</td>
                 <td data-label="Diesel">{e.diesel_included ? "Included" : e.diesel_cost ? `Extra ₹${e.diesel_cost}` : "Excluded"}</td>
                 <td data-label="Payment"><span className={`status-chip status-${e.payment_status === "paid" ? "available" : "pending"}`}>{e.payment_status}</span><div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(e)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this sale?")) { await supabase.from("daily_entries").delete().eq("id", e.id); load(); } }}>Delete</button></div></td>
@@ -123,6 +140,10 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
   const [hours, setHours] = useState(entry?.hours_worked?.toString() ?? "");
   const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) ?? "");
   const [endTime, setEndTime] = useState(entry?.end_time?.slice(0, 5) ?? "");
+  const [officeDepartureTime, setOfficeDepartureTime] = useState(entry?.office_departure_time?.slice(0, 5) ?? "");
+  const [officeReturnTime, setOfficeReturnTime] = useState(entry?.office_return_time?.slice(0, 5) ?? "");
+  const [discrepancyFlag, setDiscrepancyFlag] = useState(Boolean(entry?.discrepancy_flag));
+  const [discrepancyNote, setDiscrepancyNote] = useState(entry?.discrepancy_note ?? "");
   const [rate, setRate] = useState(entry?.rate?.toString() ?? "");
   const [amount, setAmount] = useState(entry?.amount?.toString() ?? "");
   const [dieselIncluded, setDieselIncluded] = useState(entry?.diesel_included ?? true);
@@ -159,6 +180,8 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
 
   const effectiveMinutes = hoursMode === "time" ? minutesBetween(startTime, endTime) : Math.round((Number(hours || 0)) * 60);
   const effectiveHours = effectiveMinutes / 60;
+  const officeTravelMinutes = officeDepartureTime && officeReturnTime ? minutesBetween(officeDepartureTime, officeReturnTime) : 0;
+  const totalDayHours = officeTravelMinutes ? officeTravelMinutes / 60 : effectiveHours;
   const computedAmount = billingType === "hourly" && effectiveHours && rate ? effectiveHours * Number(rate) : Number(amount || 0);
 
   async function submit() {
@@ -190,6 +213,12 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
       hours_worked: billingType === "hourly" && effectiveHours ? effectiveHours : null,
       start_time: billingType === "hourly" && hoursMode === "time" && startTime ? startTime : null,
       end_time: billingType === "hourly" && hoursMode === "time" && endTime ? endTime : null,
+      office_departure_time: officeDepartureTime || null,
+      office_return_time: officeReturnTime || null,
+      discrepancy_flag: discrepancyFlag,
+      discrepancy_note: discrepancyFlag ? (discrepancyNote || "Flagged for review") : null,
+      is_reviewed: Boolean(entry?.is_reviewed) && !discrepancyFlag ? false : Boolean(entry?.is_reviewed),
+      reviewed_at: entry?.is_reviewed ? entry.reviewed_at : null,
       rate: rate ? Number(rate) : null,
       amount: billingType === "hourly" ? computedAmount : Number(amount || 0),
       diesel_included: dieselIncluded,
@@ -249,6 +278,14 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
             </div>
             {hoursMode === "direct" ? <div className="field-group"><label className="field">Hours worked</label><input className="input" type="number" min="0" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} /></div> : <><div className="field-group"><label className="field">Start time</label><input className="input" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} /></div><div className="field-group"><label className="field">End time</label><input className="input" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div></>}
             <div className="field-group">
+              <label className="field">Office departure</label>
+              <input className="input" type="time" value={officeDepartureTime} onChange={(e) => setOfficeDepartureTime(e.target.value)} />
+            </div>
+            <div className="field-group">
+              <label className="field">Office return</label>
+              <input className="input" type="time" value={officeReturnTime} onChange={(e) => setOfficeReturnTime(e.target.value)} />
+            </div>
+            <div className="field-group">
               <label className="field">Rate per hour</label>
               <input className="input" type="number" value={rate} onChange={(e) => setRate(e.target.value)} />
             </div>
@@ -285,6 +322,27 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
           </select>
         </div>
       </div>
+
+      <div className="panel" style={{ marginTop: 18, padding: 14, border: discrepancyFlag ? "1px solid rgba(220,38,38,0.5)" : undefined }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <input type="checkbox" checked={discrepancyFlag} onChange={(e) => setDiscrepancyFlag(e.target.checked)} />
+          <label style={{ fontWeight: 700 }}>Flag for discrepancy / fraud review</label>
+        </div>
+        <textarea
+          className="input"
+          rows={3}
+          value={discrepancyNote}
+          onChange={(e) => setDiscrepancyNote(e.target.value)}
+          placeholder="Write the issue, mismatch, operator concern, or reason for management review..."
+          disabled={!discrepancyFlag}
+        />
+      </div>
+
+      {(officeDepartureTime || officeReturnTime) && (
+        <div style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
+          Total day tracked: {totalDayHours ? `${totalDayHours.toFixed(2)} hrs` : "—"}
+        </div>
+      )}
       <button className="btn btn-primary" onClick={submit} disabled={saving || !assetId}>{saving ? "Saving…" : entry ? "Update entry" : "Save entry"}</button>{onCancel && <button className="btn" onClick={onCancel} style={{ marginLeft: 8 }}>Cancel</button>}
     </div>
   );
