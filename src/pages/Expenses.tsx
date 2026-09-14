@@ -86,6 +86,13 @@ function ExpenseForm({ assets, expense, onSaved, onCancel }: { assets: Asset[]; 
   const [receipt, setReceipt] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   async function submit() {
     setSaving(true);
@@ -102,13 +109,18 @@ function ExpenseForm({ assets, expense, onSaved, onCancel }: { assets: Asset[]; 
       try { const path = await uploadFinanceAttachment(receipt, "expense", result.data.id); const update = await supabase.from("expenses").update({ receipt_url: path }).eq("id", result.data.id); error = update.error; } catch (uploadError) { error = uploadError as typeof error; }
     }
     setSaving(false);
-    if (error) setError(error.message);
-    else onSaved();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setSuccessMessage(expense ? "Expense updated successfully." : "Expense saved successfully.");
+    window.setTimeout(() => onSaved(), 250);
   }
 
   return (
     <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div className="message-banner error">{error}</div>}
+      {successMessage && <div className="message-banner success">{successMessage}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         <div className="field-group">
           <label className="field">Date</label>

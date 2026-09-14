@@ -305,6 +305,13 @@ function ContractForm({ customers, assets, existing, onSyncContract, onSaved, on
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   async function submit() {
     if (saving) return;
@@ -344,7 +351,8 @@ function ContractForm({ customers, assets, existing, onSyncContract, onSaved, on
       }).eq("id", savedContract.asset_id);
     }
 
-    onSaved();
+    setSuccessMessage(existing ? "Rental updated successfully." : "Rental created successfully.");
+    window.setTimeout(() => onSaved(), 250);
   }
 
   if (!assets.length) {
@@ -353,7 +361,8 @@ function ContractForm({ customers, assets, existing, onSyncContract, onSaved, on
 
   return (
     <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div className="message-banner error">{error}</div>}
+      {successMessage && <div className="message-banner success">{successMessage}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
         <div className="field-group">
           <label className="field">Customer</label>

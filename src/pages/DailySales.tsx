@@ -15,11 +15,21 @@ export default function DailySales() {
   const [toDate, setToDate] = useState("");
   const [assetFilter, setAssetFilter] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOpeningForm, setIsOpeningForm] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   async function load() {
+    setIsLoading(true);
     const [{ data: e, error: salesError }, { data: a }, { data: c }] = await Promise.all([
       supabase.from("daily_entries").select("*").order("entry_date", { ascending: false }),
-      supabase.from("assets").select("*"),
+      supabase.from("assets").select("*").eq("is_active", true),
       supabase.from("customers").select("*").order("name"),
     ]);
     setEntries((e ?? []) as DailyEntry[]);
@@ -28,11 +38,28 @@ export default function DailySales() {
     setLoadError(salesError?.message.includes("end_time") || salesError?.message.includes("start_time")
       ? "Sales time fields are not installed in Supabase. Run 0010_daily_sales_times.sql, then refresh."
       : salesError?.message ?? null);
+    setIsLoading(false);
   }
 
   useEffect(() => { load(); }, []);
 
-  const assetCode = (id: string) => assets.find((a) => a.id === id)?.internal_code ?? "—";
+  function openNewSale() {
+    if (!assets.length) {
+      setLoadError("Add a machine under Machines before creating a new sale.");
+      return;
+    }
+    setEditing(null);
+    setIsOpeningForm(true);
+    window.setTimeout(() => {
+      setShowForm(true);
+      setIsOpeningForm(false);
+    }, 220);
+  }
+
+  const assetCode = (id: string | null) => {
+    if (!id) return "Archived machine";
+    return assets.find((a) => a.id === id)?.internal_code ?? "Archived machine";
+  };
   const filteredEntries = entries.filter((entry) =>
     (!fromDate || entry.entry_date >= fromDate) &&
     (!toDate || entry.entry_date <= toDate) &&
@@ -45,13 +72,26 @@ export default function DailySales() {
   const monthTotal = filteredEntries.filter((e) => e.entry_date.startsWith(monthStr)).reduce((s, e) => s + e.amount, 0);
   const discrepancyCount = filteredEntries.filter((e) => e.discrepancy_flag).length;
 
+  if (isLoading) {
+    return (
+      <div className="page-loader" aria-live="polite">
+        <div className="loader-card panel">
+          <div className="loader-ring"><div className="loader-dot" /></div>
+          <div className="loader-title">Loading sales</div>
+          <div className="loader-subtitle">Preparing machine list and recent entries…</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
+      {successMessage && <div className="toast-success">{successMessage}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ fontSize: 22 }}>Sales</h1>
         {hasPermission("daily_sales.write") && (
-          <button className="btn btn-primary" onClick={() => setShowForm((s) => !s)} disabled={!assets.length}>
-            {showForm ? "Cancel" : "New sale"}
+          <button className="btn btn-primary" onClick={showForm ? () => setShowForm(false) : openNewSale} disabled={isOpeningForm}>
+            {isOpeningForm ? <span className="btn-loader-inline"><span className="mini-spinner" />Opening…</span> : showForm ? "Cancel" : "New sale"}
           </button>
         )}
       </div>
@@ -59,7 +99,7 @@ export default function DailySales() {
       <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "-8px 0 20px" }}>
         Record every machine job here. Contracts are optional and only needed when a customer requires a formal agreement.
       </p>
-      {loadError && <div className="panel" style={{ padding: 12, marginBottom: 16, color: "var(--red)" }}>{loadError}</div>}
+      {loadError && <div className="message-banner error">{loadError}</div>}
 
       <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
         <div className="panel" style={{ padding: 16, minWidth: 160 }}>
@@ -82,8 +122,8 @@ export default function DailySales() {
         <div><label className="field">To</label><input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
         <div><label className="field">Excavator</label><select className="input" value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)}><option value="">All excavators</option>{assets.map((a) => <option key={a.id} value={a.id}>{a.internal_code}</option>)}</select></div>
       </div>
-      {showForm && <DailyEntryForm key="new" assets={assets} customers={customers} onSaved={() => { setShowForm(false); load(); }} />}
-      {editing && <DailyEntryForm key={editing.id} assets={assets} customers={customers} entry={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
+      {showForm && <DailyEntryForm key="new" assets={assets} customers={customers} onSaved={() => { setSuccessMessage("Sale saved successfully."); setShowForm(false); load(); }} />}
+      {editing && <DailyEntryForm key={editing.id} assets={assets} customers={customers} entry={editing} onSaved={() => { setSuccessMessage("Sale updated successfully."); setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
 
       <div className="panel">
         <table className="data-table sales-list-table">
@@ -151,7 +191,14 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
   const [paymentStatus, setPaymentStatus] = useState(entry?.payment_status ?? "paid");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [requirements, setRequirements] = useState({ sales_customer_name: false, sales_customer_phone: false });
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   useEffect(() => { getSetting("field_requirements", "config", { sales_customer_name: false, sales_customer_phone: false }).then((config) => setRequirements(config)); }, []);
 
@@ -187,6 +234,7 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
   async function submit() {
     setSaving(true);
     setError(null);
+    setSuccessMessage(null);
     let resolvedCustomerId = customerId;
     if (requirements.sales_customer_name && !customerName.trim()) { setSaving(false); setError("Customer name is required by Settings."); return; }
     if (requirements.sales_customer_phone && !customerPhone.trim()) { setSaving(false); setError("Customer phone is required by Settings."); return; }
@@ -229,13 +277,19 @@ function DailyEntryForm({ assets, customers, entry, onSaved, onCancel }: { asset
       ? await supabase.from("daily_entries").update(values).eq("id", entry.id)
       : await supabase.from("daily_entries").insert(values);
     setSaving(false);
-    if (error) setError(error.message);
-    else onSaved();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setSuccessMessage(entry ? "Sale updated successfully." : "Sale saved successfully.");
+    window.setTimeout(() => onSaved(), 350);
   }
 
   return (
-    <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+    <div className="sales-form-shell panel" style={{ padding: 20, marginBottom: 20 }}>
+      {error && <div className="message-banner error">{error}</div>}
+      {successMessage && <div className="message-banner success">{successMessage}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         <div className="field-group">
           <label className="field">Date</label>

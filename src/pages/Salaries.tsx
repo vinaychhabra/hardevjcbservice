@@ -288,6 +288,13 @@ function SalaryForm({ operators, payment, prefill, onSaved, onCancel }: { operat
   const [notes, setNotes] = useState(payment?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   useEffect(() => {
     if (!prefill) return;
@@ -370,12 +377,14 @@ function SalaryForm({ operators, payment, prefill, onSaved, onCancel }: { operat
     }
 
     setSaving(false);
-    onSaved();
+    setSuccessMessage(payment ? "Salary updated successfully." : "Salary saved successfully.");
+    window.setTimeout(() => onSaved(), 250);
   }
 
   return (
     <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div className="message-banner error">{error}</div>}
+      {successMessage && <div className="message-banner success">{successMessage}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         {operators.length > 0 && (
           <div className="field-group">

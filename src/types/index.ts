@@ -134,7 +134,7 @@ export interface DailyEntry {
   id: string;
   entry_date: string;
   due_date: string;
-  asset_id: string;
+  asset_id: string | null;
   contract_id: string | null;
   customer_name_freeform: string | null;
   customer_id: string | null;

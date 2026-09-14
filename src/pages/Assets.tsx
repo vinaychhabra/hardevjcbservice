@@ -273,6 +273,13 @@ function AssetForm({ categories, asset, onSaved, onCancel }: { categories: Equip
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   const category = categories.find((c) => c.id === categoryId);
 
@@ -301,13 +308,18 @@ function AssetForm({ categories, asset, onSaved, onCancel }: { categories: Equip
       ? await supabase.from("assets").update(payload).eq("id", asset.id)
       : await supabase.from("assets").insert({ ...payload, status: "available" });
     setSaving(false);
-    if (error) setError(error.message);
-    else onSaved();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setSuccessMessage(asset ? "Machine updated successfully." : "Machine added successfully.");
+    window.setTimeout(() => onSaved(), 250);
   }
 
   return (
     <div className="panel" style={{ padding: 20, marginBottom: 20 }}>
-      {error && <div style={{ color: "var(--red)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div className="message-banner error">{error}</div>}
+      {successMessage && <div className="message-banner success">{successMessage}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
         <div className="field-group">
           <label className="field">Category</label>
