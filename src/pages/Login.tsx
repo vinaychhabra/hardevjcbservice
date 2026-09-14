@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
+import { formatAppError } from "../lib/errorMessages";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -16,7 +17,7 @@ export default function Login() {
     setError(null);
     const { error } = await signIn(email, password);
     setSubmitting(false);
-    if (error) setError(error);
+    if (error) setError(formatAppError(error));
     else navigate("/");
   }
 

@@ -10,6 +10,9 @@ interface Summary {
   overdueAmount: number;
   employeeCount: number;
   advanceOutstanding: number;
+  customerCount: number;
+  activeContractCount: number;
+  pendingSalesCount: number;
 }
 
 export default function Dashboard() {
@@ -19,8 +22,8 @@ export default function Dashboard() {
 
   async function load() {
     const monthStart = new Date().toISOString().slice(0, 7) + "-01";
+    const monthKey = monthStart.slice(0, 7);
     const todayStr = new Date().toISOString().slice(0, 10);
-    const twoWeeksOut = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
 
     const [
       { data: assets },
@@ -29,36 +32,65 @@ export default function Dashboard() {
       { data: salaries },
       { data: overdueInvoices },
       { data: employees },
+      { data: customers },
+      { data: contracts },
     ] = await Promise.all([
       supabase.from("assets").select("status").eq("is_active", true),
-      supabase.from("daily_entries").select("amount").gte("entry_date", monthStart),
+      supabase.from("daily_entries").select("amount, payment_status").gte("entry_date", monthStart),
       supabase.from("expenses").select("amount").gte("expense_date", monthStart),
-      supabase.from("salary_payments").select("amount, net_amount, gross_amount, advance_adjustment").gte("pay_period_start", monthStart),
-      supabase.from("invoices").select("total, amount_paid").in("status", ["sent", "partially_paid"]).lt("due_date", todayStr),
+      supabase.from("salary_payments").select("*"),
+      supabase.from("invoices").select("total, amount_paid").in("status", ["sent", "partially_paid", "overdue"]).lt("due_date", todayStr),
       supabase.from("operators").select("advance_balance, is_active"),
+      supabase.from("customers").select("id"),
+      supabase.from("rental_contracts").select("status"),
     ]);
 
     const assetStatusCounts: Record<string, number> = {};
-    (assets ?? []).forEach((a: any) => { assetStatusCounts[a.status] = (assetStatusCounts[a.status] ?? 0) + 1; });
+    (assets ?? []).forEach((a: any) => {
+      assetStatusCounts[a.status] = (assetStatusCounts[a.status] ?? 0) + 1;
+    });
+
+    const getSalaryAmount = (row: any) => {
+      const values = [row.net_amount, row.gross_amount, row.amount, row.total_amount, row.salary_amount];
+      let highestAmount = 0;
+      for (const value of values) {
+        const numericValue = Number(value ?? 0);
+        if (Number.isFinite(numericValue) && numericValue > 0) {
+          highestAmount = numericValue;
+        }
+      }
+      return highestAmount;
+    };
+
+    const salaryRows = (salaries ?? []).length ? salaries ?? [] : [];
 
     setSummary({
       assetStatusCounts,
-      monthSales: (dailyEntries ?? []).reduce((s: number, e: any) => s + e.amount, 0),
-      monthExpenses: (expenses ?? []).reduce((s: number, e: any) => s + e.amount, 0),
-      monthSalaries: (salaries ?? []).reduce((s: number, e: any) => s + (e.net_amount ?? e.amount), 0),
+      monthSales: (dailyEntries ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0),
+      monthExpenses: (expenses ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0),
+      monthSalaries: salaryRows.reduce((s: number, row: any) => s + getSalaryAmount(row), 0),
       overdueCount: (overdueInvoices ?? []).length,
-      overdueAmount: (overdueInvoices ?? []).reduce((s: number, inv: any) => s + (inv.total - inv.amount_paid), 0),
+      overdueAmount: (overdueInvoices ?? []).reduce((s: number, inv: any) => s + Math.max(0, Number(inv.total ?? 0) - Number(inv.amount_paid ?? 0)), 0),
       employeeCount: (employees ?? []).filter((e: any) => e.is_active !== false).length,
       advanceOutstanding: (employees ?? []).reduce((s: number, e: any) => s + Number(e.advance_balance ?? 0), 0),
+      customerCount: (customers ?? []).length,
+      activeContractCount: (contracts ?? []).filter((c: any) => c.status === "active").length,
+      pendingSalesCount: (dailyEntries ?? []).filter((e: any) => e.payment_status !== "paid").length,
     });
   }
 
-  if (!summary) return <div>Loading…</div>;
+  if (!summary) return <div className="panel" style={{ padding: 24 }}>Loading…</div>;
 
   const netThisMonth = summary.monthSales - summary.monthExpenses - summary.monthSalaries;
+  const quickStats = [
+    { label: "Active contracts", value: summary.activeContractCount, tone: "primary" },
+    { label: "Customers", value: summary.customerCount, tone: "success" },
+    { label: "Pending sales", value: summary.pendingSalesCount, tone: "warning" },
+    { label: "Advance", value: `₹${summary.advanceOutstanding.toLocaleString()}`, tone: "danger" },
+  ];
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr repeat(3, minmax(150px, 1fr))", gap: 12 }}>
         <div className="panel" style={{ padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
@@ -77,11 +109,20 @@ export default function Dashboard() {
         <StatCard label="Salaries" value={`₹${summary.monthSalaries.toLocaleString()}`} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(150px, 1fr))", gap: 12 }}>
+      <div className="metric-grid">
         <StatCard label="Overdue" value={`₹${summary.overdueAmount.toLocaleString()}`} negative={summary.overdueAmount > 0} />
         <StatCard label="Invoices" value={summary.overdueCount} />
         <StatCard label="Employees" value={summary.employeeCount} />
         <StatCard label="Advance" value={`₹${summary.advanceOutstanding.toLocaleString()}`} negative={summary.advanceOutstanding > 0} />
+      </div>
+
+      <div className="metric-grid compact">
+        {quickStats.map((item) => (
+          <div key={item.label} className="mini-panel">
+            <div className="mini-label">{item.label}</div>
+            <div className={`mini-value ${item.tone}`}>{typeof item.value === "number" ? item.value.toLocaleString() : item.value}</div>
+          </div>
+        ))}
       </div>
 
       <div className="panel" style={{ padding: 14 }}>

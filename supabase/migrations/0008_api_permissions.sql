@@ -26,12 +26,5 @@ begin
 	foreach table_name in array array[
 		'customers', 'contacts', 'sites', 'equipment_categories', 'assets', 'operators',
 		'leads', 'quotes', 'quote_line_items', 'rental_contracts', 'usage_logs',
-		'invoices', 'invoice_line_items', 'payments'
-	] loop
-		execute format('drop trigger if exists trg_%s_tenant on public.%I', table_name, table_name);
-		execute format(
-			'create trigger trg_%s_tenant before insert on public.%I for each row execute function public.set_current_tenant_id()',
-			table_name, table_name
-		);
-	end loop;
+			'settings', 'feature_flags', 'invoices', 'invoice_line_items', 'payments'
 end $$;

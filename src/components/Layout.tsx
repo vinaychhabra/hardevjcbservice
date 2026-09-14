@@ -41,6 +41,7 @@ export default function Layout() {
     "Reports & setup": true,
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const stored = localStorage.getItem("equiprent-theme");
     if (stored === "light" || stored === "dark") return stored;
@@ -58,7 +59,13 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+      <div
+        className={`sidebar-backdrop ${mobileSidebarOpen ? "visible" : ""}`}
+        onClick={() => setMobileSidebarOpen(false)}
+        aria-hidden={!mobileSidebarOpen}
+      />
+
+      <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""} ${mobileSidebarOpen ? "mobile-open" : ""}`}>
         <div className="brand-wrap">
           <button
             type="button"
@@ -129,8 +136,18 @@ export default function Layout() {
 
       <main className="content-area">
         <header className="topbar">
-          <div>
-            <h1 className="page-title">Overview</h1>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="mobile-menu-button"
+              aria-label="Open navigation"
+              onClick={() => setMobileSidebarOpen((open) => !open)}
+            >
+              ☰
+            </button>
+            <div>
+              <h1 className="page-title">Overview</h1>
+            </div>
           </div>
 
           <div className="topbar-actions">

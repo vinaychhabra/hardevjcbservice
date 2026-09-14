@@ -13,6 +13,7 @@ export default function Assets() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [categories, setCategories] = useState<EquipmentCategory[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Asset | null>(null);
 
   async function load() {
     const [{ data: a }, { data: c }] = await Promise.all([
@@ -21,6 +22,12 @@ export default function Assets() {
     ]);
     setAssets((a ?? []) as Asset[]);
     setCategories((c ?? []) as EquipmentCategory[]);
+  }
+
+  async function deleteAsset(id: string) {
+    if (!window.confirm("Delete this machine?")) return;
+    const { error } = await supabase.from("assets").delete().eq("id", id);
+    if (!error) load();
   }
 
   useEffect(() => { load(); }, []);
@@ -44,6 +51,7 @@ export default function Assets() {
       )}
 
       {showForm && <AssetForm categories={categories} onSaved={() => { setShowForm(false); load(); }} />}
+      {editing && <AssetForm categories={categories} asset={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
 
       <div className="panel">
         <table className="data-table">
@@ -59,7 +67,15 @@ export default function Assets() {
                 <td>{categoryName(a.category_id)}</td>
                 <td>{[a.manufacturer, a.model].filter(Boolean).join(" ") || "—"}</td>
                 <td className="mono">{a.current_meter_reading} {a.meter_type.replace("_", " ")}</td>
-                <td><span className={`status-chip status-${a.status}`}>{a.status.replace("_", " ")}</span></td>
+                <td>
+                  <span className={`status-chip status-${a.status}`}>{a.status.replace("_", " ")}</span>
+                  {hasPermission("equipment.write") && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                      <button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(a)}>Edit</button>
+                      <button className="btn" style={{ padding: "3px 7px" }} onClick={() => deleteAsset(a.id)}>Delete</button>
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
             {assets.length === 0 && (
@@ -72,12 +88,15 @@ export default function Assets() {
   );
 }
 
-function AssetForm({ categories, onSaved }: { categories: EquipmentCategory[]; onSaved: () => void }) {
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
-  const [internalCode, setInternalCode] = useState("");
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
-  const [customFields, setCustomFields] = useState<Record<string, string>>({});
+function AssetForm({ categories, asset, onSaved, onCancel }: { categories: EquipmentCategory[]; asset?: Asset; onSaved: () => void; onCancel?: () => void }) {
+  const [categoryId, setCategoryId] = useState(asset?.category_id ?? categories[0]?.id ?? "");
+  const [internalCode, setInternalCode] = useState(asset?.internal_code ?? "");
+  const [manufacturer, setManufacturer] = useState(asset?.manufacturer ?? "");
+  const [model, setModel] = useState(asset?.model ?? "");
+  const [customFields, setCustomFields] = useState<Record<string, string>>(() => {
+    const initial = asset?.custom_fields ?? {};
+    return Object.fromEntries(Object.entries(initial).map(([key, value]) => [key, String(value ?? "")]));
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,15 +105,19 @@ function AssetForm({ categories, onSaved }: { categories: EquipmentCategory[]; o
   async function submit() {
     setSaving(true);
     setError(null);
-    const { error } = await supabase.from("assets").insert({
+    const payload = {
       category_id: categoryId,
       internal_code: internalCode,
       manufacturer: manufacturer || null,
       model: model || null,
-      meter_type: category?.default_meter_type ?? "engine_hours",
-      status: "available",
+      meter_type: category?.default_meter_type ?? asset?.meter_type ?? "engine_hours",
+      status: asset?.status ?? "available",
       custom_fields: Object.keys(customFields).length ? customFields : null,
-    });
+    };
+
+    const { error } = asset
+      ? await supabase.from("assets").update(payload).eq("id", asset.id)
+      : await supabase.from("assets").insert({ ...payload, status: "available" });
     setSaving(false);
     if (error) setError(error.message);
     else onSaved();
@@ -145,8 +168,9 @@ function AssetForm({ categories, onSaved }: { categories: EquipmentCategory[]; o
       )}
 
       <button className="btn btn-primary" onClick={submit} disabled={saving || !internalCode || !categoryId}>
-        {saving ? "Saving…" : "Save machine"}
+        {saving ? "Saving…" : asset ? "Update machine" : "Save machine"}
       </button>
+      {onCancel && <button className="btn" onClick={onCancel} style={{ marginLeft: 8 }}>Cancel</button>}
     </div>
   );
 }

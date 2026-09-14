@@ -81,7 +81,7 @@ export default function DailySales() {
       {editing && <DailyEntryForm key={editing.id} assets={assets} customers={customers} entry={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
 
       <div className="panel">
-        <table className="data-table">
+        <table className="data-table sales-list-table">
           <thead>
             <tr>
               <th>Date</th><th>Machine</th><th>Customer / site</th><th>Billing</th><th>Time / hours</th><th>Amount</th><th>Diesel</th><th>Payment</th>
@@ -90,14 +90,14 @@ export default function DailySales() {
           <tbody>
             {filteredEntries.map((e) => (
               <tr key={e.id}>
-                <td>{e.entry_date}</td>
-                <td className="mono">{assetCode(e.asset_id)}</td>
-                <td>{[e.customer_name_freeform, e.site_name].filter(Boolean).join(" · ") || "—"}</td>
-                <td>{e.billing_type.replace("_", " ")}</td>
-                <td>{e.start_time && e.end_time ? `${e.start_time.slice(0, 5)} - ${e.end_time.slice(0, 5)}` : e.hours_worked != null ? `${e.hours_worked} h` : "—"}</td>
-                <td>₹{e.amount.toLocaleString()}</td>
-                <td>{e.diesel_included ? "Included" : e.diesel_cost ? `Extra ₹${e.diesel_cost}` : "Excluded"}</td>
-                <td><span className={`status-chip status-${e.payment_status === "paid" ? "available" : "pending"}`}>{e.payment_status}</span><div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(e)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this sale?")) { await supabase.from("daily_entries").delete().eq("id", e.id); load(); } }}>Delete</button></div></td>
+                <td data-label="Date">{e.entry_date}</td>
+                <td data-label="Machine" className="mono">{assetCode(e.asset_id)}</td>
+                <td data-label="Customer / site">{[e.customer_name_freeform, e.site_name].filter(Boolean).join(" · ") || "—"}</td>
+                <td data-label="Billing">{e.billing_type.replace("_", " ")}</td>
+                <td data-label="Time / hours">{e.start_time && e.end_time ? `${e.start_time.slice(0, 5)} - ${e.end_time.slice(0, 5)}` : e.hours_worked != null ? `${e.hours_worked} h` : "—"}</td>
+                <td data-label="Amount">₹{e.amount.toLocaleString()}</td>
+                <td data-label="Diesel">{e.diesel_included ? "Included" : e.diesel_cost ? `Extra ₹${e.diesel_cost}` : "Excluded"}</td>
+                <td data-label="Payment"><span className={`status-chip status-${e.payment_status === "paid" ? "available" : "pending"}`}>{e.payment_status}</span><div style={{ display: "flex", gap: 6, marginTop: 6 }}><button className="btn" style={{ padding: "3px 7px" }} onClick={() => setEditing(e)}>Edit</button><button className="btn" style={{ padding: "3px 7px" }} onClick={async () => { if (window.confirm("Delete this sale?")) { await supabase.from("daily_entries").delete().eq("id", e.id); load(); } }}>Delete</button></div></td>
               </tr>
             ))}
             {filteredEntries.length === 0 && (

@@ -22,7 +22,9 @@ export default function Salaries() {
   useEffect(() => { load(); }, []);
 
   const monthStr = new Date().toISOString().slice(0, 7);
-  const monthTotal = payments.filter((p) => p.pay_period_start.startsWith(monthStr)).reduce((s, p) => s + Number(p.net_amount ?? p.amount), 0);
+  const monthTotal = payments
+    .filter((p) => (p.pay_period_start ?? "").startsWith(monthStr) || (p.paid_date ?? "").startsWith(monthStr))
+    .reduce((s, p) => s + Number(p.net_amount ?? p.gross_amount ?? p.amount ?? 0), 0);
 
   return (
     <div>
@@ -89,19 +91,25 @@ function SalaryForm({ operators, payment, onSaved, onCancel }: { operators: Oper
     setSaving(true);
     setError(null);
 
-    const values = {
+    const baseValues = {
       operator_id: operatorId || null,
       staff_name: staffName,
       pay_period_start: periodStart,
       pay_period_end: periodEnd,
-      gross_amount: Number(grossAmount || 0),
-      advance_adjustment: Number(advanceAdjustment || 0),
-      net_amount: netAmount,
-      amount: netAmount,
+      amount: Number(netAmount || 0),
       paid_date: paidDate,
       payment_method: method,
       notes: notes || null,
     };
+
+    const { data: schemaCheck, error: schemaError } = await supabase.from("salary_payments").select("gross_amount, advance_adjustment, net_amount").limit(1);
+    const values = { ...baseValues } as Record<string, any>;
+
+    if (!schemaError) {
+      values.gross_amount = Number(grossAmount || 0);
+      values.advance_adjustment = Number(advanceAdjustment || 0);
+      values.net_amount = netAmount;
+    }
 
     const { error: saveError } = payment
       ? await supabase.from("salary_payments").update(values).eq("id", payment.id)

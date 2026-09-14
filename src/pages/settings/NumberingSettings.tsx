@@ -8,6 +8,7 @@ export default function NumberingSettings() {
   const [quote, setQuote] = useState<NumberingConfig>({ prefix: "QTE-", next_seq: 1 });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSetting("numbering", "invoice", invoice).then(setInvoice);
@@ -16,11 +17,20 @@ export default function NumberingSettings() {
 
   async function save() {
     setSaving(true);
-    await Promise.all([
+    setError(null);
+
+    const [invoiceResult, quoteResult] = await Promise.all([
       upsertSetting("numbering", "invoice", invoice as unknown as Record<string, unknown>),
       upsertSetting("numbering", "quote", quote as unknown as Record<string, unknown>),
     ]);
+
     setSaving(false);
+
+    if (invoiceResult.error || quoteResult.error) {
+      setError((invoiceResult.error?.message ?? quoteResult.error?.message) || "Could not save the numbering settings.");
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -45,6 +55,8 @@ export default function NumberingSettings() {
           <input className="input" placeholder="Prefix" value={quote.prefix} onChange={(e) => setQuote({ ...quote, prefix: e.target.value })} />
           <input className="input" type="number" placeholder="Next number" value={quote.next_seq} onChange={(e) => setQuote({ ...quote, next_seq: Number(e.target.value) })} />
         </div>
+
+        {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
         <button className="btn btn-primary" onClick={save} disabled={saving}>
           {saving ? "Saving…" : saved ? "Saved" : "Save changes"}

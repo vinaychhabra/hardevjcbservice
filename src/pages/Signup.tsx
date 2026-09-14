@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
+import { formatAppError } from "../lib/errorMessages";
 
 export default function Signup() {
   const { signUp } = useAuth();
@@ -18,7 +19,7 @@ export default function Signup() {
     setError(null);
     const { error } = await signUp({ email, password, fullName, companyName });
     setSubmitting(false);
-    if (error) setError(error);
+    if (error) setError(formatAppError(error));
     else navigate("/");
   }
 

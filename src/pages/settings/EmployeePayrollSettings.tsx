@@ -17,6 +17,7 @@ export default function EmployeePayrollSettings() {
   const [config, setConfig] = useState<EmployeePayrollSettingsConfig>(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSetting<EmployeePayrollSettingsConfig>("employee_roles", "config", DEFAULT_CONFIG).then((data) => {
@@ -34,8 +35,15 @@ export default function EmployeePayrollSettings() {
 
   async function save() {
     setSaving(true);
-    await upsertSetting("employee_roles", "config", config as unknown as Record<string, unknown>);
+    setError(null);
+    const result = await upsertSetting("employee_roles", "config", config as unknown as Record<string, unknown>);
     setSaving(false);
+
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -80,6 +88,8 @@ export default function EmployeePayrollSettings() {
             />
           </div>
         </div>
+
+        {error && <div style={{ color: "var(--danger)", marginTop: 16, fontSize: 13 }}>{error}</div>}
 
         <button className="btn btn-primary" onClick={save} disabled={saving} style={{ marginTop: 18 }}>
           {saving ? "Saving…" : saved ? "Saved" : "Save changes"}

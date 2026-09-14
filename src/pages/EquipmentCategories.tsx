@@ -11,10 +11,17 @@ export default function EquipmentCategories() {
   const { hasPermission } = useAuth();
   const [categories, setCategories] = useState<EquipmentCategory[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<EquipmentCategory | null>(null);
 
   async function load() {
     const { data } = await supabase.from("equipment_categories").select("*").order("name");
     setCategories((data ?? []) as EquipmentCategory[]);
+  }
+
+  async function deleteCategory(id: string) {
+    if (!window.confirm("Delete this equipment category?")) return;
+    const { error } = await supabase.from("equipment_categories").delete().eq("id", id);
+    if (!error) load();
   }
 
   useEffect(() => { load(); }, []);
@@ -35,6 +42,7 @@ export default function EquipmentCategories() {
       </p>
 
       {showForm && <CategoryForm onSaved={() => { setShowForm(false); load(); }} />}
+      {editing && <CategoryForm category={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
         {categories.map((c) => (
@@ -52,6 +60,12 @@ export default function EquipmentCategories() {
                 ))}
               </div>
             )}
+            {hasPermission("equipment.write") && (
+              <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                <button className="btn" style={{ padding: "4px 8px" }} onClick={() => setEditing(c)}>Edit</button>
+                <button className="btn" style={{ padding: "4px 8px" }} onClick={() => deleteCategory(c.id)}>Delete</button>
+              </div>
+            )}
           </div>
         ))}
         {categories.length === 0 && <p style={{ color: "var(--text-muted)" }}>No categories yet.</p>}
@@ -60,11 +74,11 @@ export default function EquipmentCategories() {
   );
 }
 
-function CategoryForm({ onSaved }: { onSaved: () => void }) {
-  const [name, setName] = useState("");
-  const [meterType, setMeterType] = useState("engine_hours");
-  const [billingUnit, setBillingUnit] = useState("day");
-  const [fields, setFields] = useState<CustomFieldDef[]>([]);
+function CategoryForm({ category, onSaved, onCancel }: { category?: EquipmentCategory; onSaved: () => void; onCancel?: () => void }) {
+  const [name, setName] = useState(category?.name ?? "");
+  const [meterType, setMeterType] = useState(category?.default_meter_type ?? "engine_hours");
+  const [billingUnit, setBillingUnit] = useState(category?.default_billing_unit ?? "day");
+  const [fields, setFields] = useState<CustomFieldDef[]>(category?.custom_fields_schema ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,12 +99,16 @@ function CategoryForm({ onSaved }: { onSaved: () => void }) {
       .filter((f) => f.label)
       .map((f) => ({ ...f, key: f.key || f.label.toLowerCase().replace(/\s+/g, "_") }));
 
-    const { error } = await supabase.from("equipment_categories").insert({
+    const payload = {
       name,
       default_meter_type: meterType,
       default_billing_unit: billingUnit,
       custom_fields_schema: cleanFields.length ? cleanFields : null,
-    });
+    };
+
+    const { error } = category
+      ? await supabase.from("equipment_categories").update(payload).eq("id", category.id)
+      : await supabase.from("equipment_categories").insert(payload);
     setSaving(false);
     if (error) setError(error.message);
     else onSaved();
@@ -133,8 +151,9 @@ function CategoryForm({ onSaved }: { onSaved: () => void }) {
 
       <div>
         <button className="btn btn-primary" onClick={submit} disabled={saving || !name}>
-          {saving ? "Saving…" : "Save category"}
+          {saving ? "Saving…" : category ? "Update category" : "Save category"}
         </button>
+        {onCancel && <button className="btn" onClick={onCancel} style={{ marginLeft: 8 }}>Cancel</button>}
       </div>
     </div>
   );

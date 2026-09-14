@@ -20,6 +20,12 @@ export default function Customers() {
     setLoading(false);
   }
 
+  async function deleteCustomer(id: string) {
+    if (!window.confirm("Delete this customer?")) return;
+    const { error } = await supabase.from("customers").delete().eq("id", id);
+    if (!error) load();
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -62,7 +68,14 @@ export default function Customers() {
                 <td className="mono">{c.tax_id ?? "—"}</td>
                 <td>{c.payment_terms_days} days</td>
                 <td>{c.credit_limit != null ? `₹${c.credit_limit.toLocaleString()}` : "—"}</td>
-                <td>{hasPermission("customers.write") && <button className="btn" style={{ padding: "4px 8px" }} onClick={() => setEditing(c)}>Edit</button>}</td>
+                <td>
+                  {hasPermission("customers.write") && (
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <button className="btn" style={{ padding: "4px 8px" }} onClick={() => setEditing(c)}>Edit</button>
+                      <button className="btn" style={{ padding: "4px 8px" }} onClick={() => deleteCustomer(c.id)}>Delete</button>
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
             {!loading && customers.length === 0 && (

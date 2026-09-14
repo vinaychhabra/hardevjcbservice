@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { formatAppError } from "./errorMessages";
 import { Profile, Role } from "../types";
 
 interface AuthState {
@@ -69,14 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    return { error: error ? formatAppError(error.message) : null };
   }
 
   async function signUp({ email, password, fullName, companyName }: {
     email: string; password: string; fullName: string; companyName: string;
   }) {
     const { error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) return { error: signUpError.message };
+    if (signUpError) return { error: formatAppError(signUpError.message) };
 
     // The auth.signUp call above creates the auth.users row and (if
     // email confirmation is off in your Supabase project) an active
@@ -86,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       company_name: companyName,
       full_name: fullName,
     });
-    if (rpcError) return { error: rpcError.message };
+    if (rpcError) return { error: formatAppError(rpcError.message) };
 
     await loadProfile();
     return { error: null };
